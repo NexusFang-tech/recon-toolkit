@@ -343,10 +343,37 @@ async function startScan(){
 // ── DATA SOURCES ───────────────────────────────────────────────────────────
 
 async function fetchWHOIS(domain){
-  // whoisjsonapi is CORS-friendly and free
-  const resp=await fetch(`https://whoisjsonapi.com/v1/${domain}`,{signal:AbortSignal.timeout(8000)});
-  if(!resp.ok)throw new Error('WHOIS failed');
-  return await resp.json();
+  // RDAP = modern WHOIS replacement, fully CORS-friendly, ICANN-maintained
+  const tld=domain.split('.').pop();
+  let rdapBase='https://rdap.org/domain/';
+  try{
+    const boot=await fetch('https://data.iana.org/rdap/dns.json',{signal:AbortSignal.timeout(5000)});
+    if(boot.ok){
+      const bdata=await boot.json();
+      const entry=bdata.services?.find(s=>s[0].some(t=>t.toLowerCase()===tld));
+      if(entry&&entry[1]&&entry[1][0]) rdapBase=entry[1][0]+'domain/';
+    }
+  }catch(e){}
+  const resp=await fetch(rdapBase+domain,{signal:AbortSignal.timeout(8000)});
+  if(!resp.ok) throw new Error('RDAP '+resp.status);
+  const d=await resp.json();
+  const getEnt=(arr,role)=>arr?.find(e=>e.roles?.includes(role));
+  const registrar=getEnt(d.entities,'registrar');
+  const registrant=getEnt(d.entities,'registrant');
+  const getDate=(type)=>d.events?.find(e=>e.eventAction===type)?.eventDate;
+  return {
+    registrar: registrar?.vcardArray?.[1]?.find(v=>v[0]==='fn')?.[3]||registrar?.handle||'—',
+    creation_date: getDate('registration')?new Date(getDate('registration')).toUTCString():'—',
+    expiration_date: getDate('expiration')?new Date(getDate('expiration')).toUTCString():'—',
+    updated_date: getDate('last changed')?new Date(getDate('last changed')).toUTCString():'—',
+    status: d.status?.join(', ')||'—',
+    name_servers: d.nameservers?.map(n=>n.ldhName).join(', ')||'—',
+    org: registrant?.vcardArray?.[1]?.find(v=>v[0]==='org')?.[3]||'—',
+    country: registrant?.vcardArray?.[1]?.find(v=>v[0]==='adr')?.[3]?.['country-name']||'—',
+    dnssec: d.secureDNS?.delegationSigned?'Signed':'Unsigned',
+    handle: d.handle||'—',
+    _raw_expiry: getDate('expiration'),
+  };
 }
 
 async function fetchDNS(domain){
@@ -364,7 +391,9 @@ async function fetchDNS(domain){
 }
 
 async function fetchCerts(domain){
-  const resp=await fetch(`https://crt.sh/?q=%.${domain}&output=json`,{signal:AbortSignal.timeout(12000)});
+  // Query both wildcard subdomains AND root domain
+  const query=encodeURIComponent('%25.'+domain);
+  const resp=await fetch('https://crt.sh/?q='+query+'&output=json',{signal:AbortSignal.timeout(15000)});
   if(!resp.ok)throw new Error('crt.sh failed');
   const data=await resp.json();
   // Deduplicate by common_name
@@ -458,8 +487,8 @@ function renderReport(r){
       ];
 
       // Check expiry
-      if(w.expiration_date||w.expiry_date){
-        const exp=new Date(w.expiration_date||w.expiry_date);
+      if(w._raw_expiry||w.expiration_date||w.expiry_date){
+        const exp=new Date(w._raw_expiry||w.expiration_date||w.expiry_date);
         const daysLeft=Math.floor((exp-new Date())/86400000);
         if(daysLeft<30&&daysLeft>0) findings.push(`Domain expires in ${daysLeft} days`);
         if(daysLeft<0) findings.push('Domain may be expired');
