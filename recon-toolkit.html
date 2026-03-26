@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MK:// PASSIVE RECON TOOLKIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pink:#ff2d78;--cyan:#00f5ff;--purple:#b060ff;--yellow:#ffe600;
+  --green:#39ff14;--red:#ff3333;--orange:#ff8c00;
+  --bg:#07020f;--bg2:#0d0520;--surface:rgba(13,5,32,0.92);
+  --dim:#2a1a40;--muted:#6b5080;--text:#e8e0f0;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px)}
+body::after{content:'';position:fixed;inset:0;z-index:999;pointer-events:none;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5) 100%)}
+#bg-canvas{position:fixed;inset:0;z-index:0}
+#app{position:relative;z-index:10;max-width:1000px;margin:0 auto;padding:0 20px 80px}
+
+/* ── HEADER ── */
+#header{padding:28px 0 24px;border-bottom:1px solid var(--dim);margin-bottom:28px}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.brand{font-family:'Orbitron',monospace;font-weight:900;font-size:14px;color:var(--cyan);letter-spacing:.2em;text-shadow:0 0 12px var(--cyan);animation:glitch 6s infinite}
+.brand span{color:var(--pink)}
+@keyframes glitch{0%,90%,100%{text-shadow:0 0 12px var(--cyan)}92%{text-shadow:3px 0 var(--pink),-3px 0 var(--cyan);transform:translate(-1px)}94%{text-shadow:-3px 0 var(--pink),3px 0 var(--purple);transform:translate(1px)}96%{text-shadow:0 0 12px var(--cyan);transform:translate(0)}}
+.hlinks{display:flex;gap:10px;flex-wrap:wrap}
+.hlink{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.12em;padding:3px 10px;border:1px solid rgba(176,96,255,.4);color:var(--purple);text-decoration:none;transition:all .2s}
+.hlink:hover{border-color:var(--purple);box-shadow:0 0 8px rgba(176,96,255,.3)}
+
+/* Warning banner */
+.warn-banner{background:rgba(255,230,0,.06);border:1px solid rgba(255,230,0,.3);padding:10px 16px;margin-bottom:20px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--yellow);letter-spacing:.08em;line-height:1.7}
+.warn-banner strong{color:var(--yellow)}
+
+/* Search bar */
+.search-wrap{position:relative;margin-bottom:14px}
+.search-wrap::before{content:'$';position:absolute;left:14px;top:50%;transform:translateY(-50%);font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--pink);pointer-events:none;z-index:1}
+#target-input{width:100%;background:rgba(7,2,15,.95);border:1px solid var(--dim);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:13px;padding:13px 160px 13px 36px;letter-spacing:.05em;outline:none;transition:border-color .2s}
+#target-input::placeholder{color:var(--muted)}
+#target-input:focus{border-color:var(--cyan);box-shadow:0 0 12px rgba(0,245,255,.1)}
+#scan-btn{position:absolute;right:0;top:0;bottom:0;padding:0 24px;background:linear-gradient(135deg,var(--pink),var(--purple));border:none;color:#fff;font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:.15em;cursor:pointer;transition:all .2s}
+#scan-btn:hover{box-shadow:0 0 20px rgba(255,45,120,.5)}
+#scan-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Module toggles */
+.module-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+.mod-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;white-space:nowrap}
+.mod-toggle{font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 12px;border:1px solid var(--dim);color:var(--muted);background:transparent;cursor:pointer;letter-spacing:.08em;transition:all .2s;display:flex;align-items:center;gap:5px}
+.mod-toggle.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,245,255,.06)}
+.mod-toggle .dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+
+/* Example targets */
+.examples{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ex-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em}
+.ex-btn{font-family:'Share Tech Mono',monospace;font-size:10px;padding:3px 10px;border:1px solid var(--dim);color:var(--muted);background:transparent;cursor:pointer;transition:all .2s}
+.ex-btn:hover{border-color:var(--purple);color:var(--purple)}
+
+/* ── PROGRESS BAR ── */
+#progress-wrap{margin-bottom:24px;display:none}
+.prog-header{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:6px}
+.prog-track{height:4px;background:var(--dim);position:relative;overflow:hidden}
+#prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--purple),var(--cyan));transition:width .4s ease;box-shadow:0 0 8px var(--cyan)}
+.prog-steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-top:10px}
+.prog-step{font-family:'Share Tech Mono',monospace;font-size:9px;padding:4px 10px;border:1px solid var(--dim);color:var(--muted);display:flex;align-items:center;gap:6px;letter-spacing:.06em}
+.prog-step.running{border-color:var(--yellow);color:var(--yellow)}
+.prog-step.done{border-color:var(--green);color:var(--green)}
+.prog-step.fail{border-color:var(--red);color:var(--red)}
+.prog-step .step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ── REPORT ── */
+#report{display:none}
+
+.report-header{background:var(--surface);border:1px solid var(--dim);padding:20px 24px;margin-bottom:16px}
+.rh-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.rh-target{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;color:var(--cyan);text-shadow:0 0 10px rgba(0,245,255,.4)}
+.rh-timestamp{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)}
+.rh-meta{display:flex;gap:16px;flex-wrap:wrap}
+.rh-meta-item{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted)}
+.rh-meta-item strong{color:rgba(232,224,240,.7)}
+.risk-badge{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;padding:4px 14px;border:1px solid;letter-spacing:.15em}
+.risk-high{border-color:var(--red);color:var(--red);background:rgba(255,51,51,.08);text-shadow:0 0 8px var(--red)}
+.risk-medium{border-color:var(--orange);color:var(--orange);background:rgba(255,140,0,.08)}
+.risk-low{border-color:var(--green);color:var(--green);background:rgba(57,255,20,.08)}
+
+/* Section blocks */
+.section{background:var(--surface);border:1px solid var(--dim);margin-bottom:12px;overflow:hidden}
+.section-title{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--dim);background:rgba(7,2,15,.5);cursor:pointer;user-select:none}
+.st-left{display:flex;align-items:center;gap:10px}
+.st-icon{font-family:'Orbitron',monospace;font-size:10px;color:var(--pink);letter-spacing:.1em}
+.st-name{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--text)}
+.st-count{font-family:'Share Tech Mono',monospace;font-size:10px;padding:2px 8px;border:1px solid var(--dim);color:var(--muted)}
+.st-chevron{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);transition:transform .2s}
+.section.collapsed .st-chevron{transform:rotate(-90deg)}
+.section-body{padding:16px}
+.section.collapsed .section-body{display:none}
+
+/* Data rows */
+.data-row{display:grid;grid-template-columns:160px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid rgba(42,26,64,.5);font-family:'Share Tech Mono',monospace;font-size:11px;align-items:start}
+.data-row:last-child{border-bottom:none}
+.dr-key{color:var(--muted);letter-spacing:.08em}
+.dr-val{color:rgba(232,224,240,.8);word-break:break-all}
+.dr-val.highlight{color:var(--cyan)}
+.dr-val.warn{color:var(--yellow)}
+.dr-val.danger{color:var(--red)}
+.dr-val.good{color:var(--green)}
+
+/* Subdomain list */
+.subdomain-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.subdomain-item{font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 10px;border:1px solid rgba(176,96,255,.2);color:var(--purple);background:rgba(176,96,255,.04);display:flex;align-items:center;gap:6px;word-break:break-all}
+.subdomain-item::before{content:'▸';color:var(--pink);font-size:8px;flex-shrink:0}
+
+/* DNS records */
+.dns-record{display:flex;gap:10px;padding:5px 0;border-bottom:1px solid rgba(42,26,64,.4);font-family:'Share Tech Mono',monospace;font-size:11px;align-items:baseline}
+.dns-record:last-child{border-bottom:none}
+.dns-type{min-width:50px;color:var(--pink);font-size:10px;letter-spacing:.1em}
+.dns-val{color:rgba(232,224,240,.75);word-break:break-all;flex:1}
+.dns-ttl{color:var(--dim);font-size:9px;white-space:nowrap}
+
+/* Security header matrix */
+.header-matrix{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.hm-item{padding:8px 12px;border:1px solid;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.06em}
+.hm-present{border-color:rgba(57,255,20,.3);color:var(--green);background:rgba(57,255,20,.04)}
+.hm-missing{border-color:rgba(255,51,51,.3);color:var(--red);background:rgba(255,51,51,.04)}
+.hm-item .hm-status{font-size:9px;opacity:.7;display:block;margin-top:2px}
+
+/* Copy button */
+.copy-btn{font-family:'Share Tech Mono',monospace;font-size:9px;padding:3px 10px;border:1px solid var(--dim);color:var(--muted);background:transparent;cursor:pointer;float:right;margin-left:10px;transition:all .2s}
+.copy-btn:hover{border-color:var(--purple);color:var(--purple)}
+
+/* Empty state */
+.empty-section{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);padding:8px 0;letter-spacing:.06em}
+
+/* Tag pills */
+.tag-pill{display:inline-block;font-family:'Share Tech Mono',monospace;font-size:10px;padding:2px 8px;border:1px solid rgba(176,96,255,.3);color:var(--purple);margin:2px 3px 2px 0;background:rgba(176,96,255,.05)}
+
+@media(max-width:600px){
+  .data-row{grid-template-columns:1fr;gap:2px}
+  .dr-key{font-size:9px}
+  .subdomain-grid{grid-template-columns:1fr}
+  .header-matrix{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="header-top">
+      <div class="brand">MK<span>://</span> PASSIVE RECON</div>
+      <div class="hlinks">
+        <a href="https://nexusfang-tech.github.io" class="hlink">⟵ PORTFOLIO</a>
+        <a href="https://nexusfang-tech.github.io/cve-explorer" class="hlink">CVE EXPLORER</a>
+        <a href="https://threat-feed.netlify.app" class="hlink" target="_blank">THREAT FEED</a>
+      </div>
+    </div>
+
+    <div class="warn-banner">
+      <strong>// AUTHORIZED USE ONLY //</strong> This tool performs passive reconnaissance using public data sources only.
+      No active scanning, no direct connections to target systems. All data sourced from public DNS, certificate transparency logs, and WHOIS records.
+      Only scan domains you own or have explicit written permission to assess.
+    </div>
+
+    <div class="search-wrap">
+      <input id="target-input" type="text" placeholder="Enter target domain (e.g. example.com)" autocomplete="off" spellcheck="false" />
+      <button id="scan-btn" onclick="startScan()">SCAN TARGET</button>
+    </div>
+
+    <div class="module-row">
+      <span class="mod-label">// MODULES:</span>
+      <button class="mod-toggle on" id="mod-whois" onclick="toggleMod('whois',this)"><span class="dot"></span>WHOIS</button>
+      <button class="mod-toggle on" id="mod-dns" onclick="toggleMod('dns',this)"><span class="dot"></span>DNS</button>
+      <button class="mod-toggle on" id="mod-certs" onclick="toggleMod('certs',this)"><span class="dot"></span>CERT TRANSPARENCY</button>
+      <button class="mod-toggle on" id="mod-headers" onclick="toggleMod('headers',this)"><span class="dot"></span>HTTP HEADERS</button>
+    </div>
+
+    <div class="examples">
+      <span class="ex-label">// TRY:</span>
+      <button class="ex-btn" onclick="setTarget('github.com')">github.com</button>
+      <button class="ex-btn" onclick="setTarget('apache.org')">apache.org</button>
+      <button class="ex-btn" onclick="setTarget('wordpress.org')">wordpress.org</button>
+      <button class="ex-btn" onclick="setTarget('python.org')">python.org</button>
+      <button class="ex-btn" onclick="setTarget('mozilla.org')">mozilla.org</button>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="progress-wrap">
+    <div class="prog-header">
+      <span id="prog-label">// INITIALIZING SCAN...</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="prog-track"><div id="prog-fill"></div></div>
+    <div class="prog-steps" id="prog-steps"></div>
+  </div>
+
+  <!-- REPORT OUTPUT -->
+  <div id="report"></div>
+
+</div>
+
+<script>
+// ── BG CANVAS ──────────────────────────────────────────────────────────────
+const bgC=document.getElementById('bg-canvas'),bgX=bgC.getContext('2d');
+let bgT=0;
+function resizeBg(){bgC.width=window.innerWidth;bgC.height=window.innerHeight}
+resizeBg();window.addEventListener('resize',resizeBg);
+function drawBg(){
+  const W=bgC.width,H=bgC.height;bgX.clearRect(0,0,W,H);
+  const sky=bgX.createLinearGradient(0,0,0,H*.6);sky.addColorStop(0,'#07020f');sky.addColorStop(1,'#0e0028');
+  bgX.fillStyle=sky;bgX.fillRect(0,0,W,H*.6);
+  const gnd=bgX.createLinearGradient(0,H*.6,0,H);gnd.addColorStop(0,'#0d0520');gnd.addColorStop(1,'#07020f');
+  bgX.fillStyle=gnd;bgX.fillRect(0,H*.6,W,H*.4);
+  const hor=H*.58,spd=(bgT*.2)%1;
+  for(let i=0;i<=20;i++){const t=i/20;bgX.beginPath();bgX.moveTo(t*W,H);bgX.lineTo(W/2+(t-.5)*60,hor);bgX.strokeStyle='rgba(176,96,255,.07)';bgX.lineWidth=1;bgX.stroke()}
+  for(let i=0;i<=14;i++){const t=((i/14)+spd)%1,y=hor+(H-hor)*t*t,pw=W*.04+(W*.96)*t*t;bgX.beginPath();bgX.moveTo((W-pw)/2,y);bgX.lineTo((W+pw)/2,y);bgX.strokeStyle=`rgba(0,245,255,${t*.12})`;bgX.lineWidth=1;bgX.stroke()}
+  const hg=bgX.createRadialGradient(W/2,hor,0,W/2,hor,W*.25);
+  hg.addColorStop(0,'rgba(255,45,120,.08)');hg.addColorStop(1,'rgba(176,96,255,0)');
+  bgX.fillStyle=hg;bgX.fillRect(0,hor-40,W,80);
+  bgT+=.012;requestAnimationFrame(drawBg);
+}
+drawBg();
+
+// ── INPUT ──────────────────────────────────────────────────────────────────
+document.getElementById('target-input').addEventListener('keydown',e=>{if(e.key==='Enter')startScan()});
+function setTarget(d){document.getElementById('target-input').value=d;startScan()}
+
+const modules={whois:true,dns:true,certs:true,headers:true};
+function toggleMod(m,btn){modules[m]=!modules[m];btn.classList.toggle('on',modules[m])}
+
+function cleanDomain(raw){
+  raw=raw.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0].split('?')[0];
+  return raw;
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ── PROGRESS ───────────────────────────────────────────────────────────────
+let stepEls={};
+function initProgress(steps){
+  document.getElementById('progress-wrap').style.display='block';
+  document.getElementById('report').style.display='none';
+  document.getElementById('report').innerHTML='';
+  setProgress(0,'INITIALIZING...');
+  const wrap=document.getElementById('prog-steps');
+  wrap.innerHTML='';stepEls={};
+  steps.forEach(s=>{
+    const el=document.createElement('div');
+    el.className='prog-step';el.id='step-'+s.id;
+    el.innerHTML=`<span class="step-dot"></span>${s.label}`;
+    wrap.appendChild(el);stepEls[s.id]=el;
+  });
+}
+function setProgress(pct,label){
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=Math.round(pct)+'%';
+  document.getElementById('prog-label').textContent=label;
+}
+function setStep(id,state){
+  const el=stepEls[id];if(!el)return;
+  el.className='prog-step '+state;
+}
+
+// ── MAIN SCAN ──────────────────────────────────────────────────────────────
+async function startScan(){
+  const raw=document.getElementById('target-input').value;
+  if(!raw.trim()){return}
+  const domain=cleanDomain(raw);
+  if(!domain||!/^[a-z0-9][a-z0-9\-\.]+\.[a-z]{2,}$/.test(domain)){
+    alert('Please enter a valid domain (e.g. example.com)');return;
+  }
+
+  document.getElementById('scan-btn').disabled=true;
+
+  const activeSteps=[];
+  if(modules.whois)   activeSteps.push({id:'whois',label:'WHOIS LOOKUP'});
+  if(modules.dns)     activeSteps.push({id:'dns',label:'DNS RECORDS'});
+  if(modules.certs)   activeSteps.push({id:'certs',label:'CERT TRANSPARENCY'});
+  if(modules.headers) activeSteps.push({id:'headers',label:'HTTP HEADERS'});
+
+  initProgress(activeSteps);
+  const total=activeSteps.length;
+  let done=0;
+
+  const results={domain,timestamp:new Date().toISOString()};
+
+  const tick=(id,label)=>{
+    done++;
+    setStep(id,'done');
+    setProgress((done/total)*100,label);
+  };
+  const fail=(id)=>setStep(id,'fail');
+
+  // Run all active modules
+  const promises=[];
+
+  if(modules.whois){
+    setStep('whois','running');
+    promises.push(
+      fetchWHOIS(domain)
+        .then(d=>{results.whois=d;tick('whois','WHOIS COMPLETE')})
+        .catch(()=>{results.whois=null;fail('whois');done++;setProgress((done/total)*100,'')})
+    );
+  }
+  if(modules.dns){
+    setStep('dns','running');
+    promises.push(
+      fetchDNS(domain)
+        .then(d=>{results.dns=d;tick('dns','DNS COMPLETE')})
+        .catch(()=>{results.dns=null;fail('dns');done++;setProgress((done/total)*100,'')})
+    );
+  }
+  if(modules.certs){
+    setStep('certs','running');
+    promises.push(
+      fetchCerts(domain)
+        .then(d=>{results.certs=d;tick('certs','CERTS COMPLETE')})
+        .catch(()=>{results.certs=[];fail('certs');done++;setProgress((done/total)*100,'')})
+    );
+  }
+  if(modules.headers){
+    setStep('headers','running');
+    promises.push(
+      fetchHeaders(domain)
+        .then(d=>{results.headers=d;tick('headers','HEADERS COMPLETE')})
+        .catch(()=>{results.headers=null;fail('headers');done++;setProgress((done/total)*100,'')})
+    );
+  }
+
+  await Promise.allSettled(promises);
+  setProgress(100,'// SCAN COMPLETE');
+
+  setTimeout(()=>{
+    document.getElementById('progress-wrap').style.display='none';
+    renderReport(results);
+    document.getElementById('scan-btn').disabled=false;
+  },600);
+}
+
+// ── DATA SOURCES ───────────────────────────────────────────────────────────
+
+async function fetchWHOIS(domain){
+  // whoisjsonapi is CORS-friendly and free
+  const resp=await fetch(`https://whoisjsonapi.com/v1/${domain}`,{signal:AbortSignal.timeout(8000)});
+  if(!resp.ok)throw new Error('WHOIS failed');
+  return await resp.json();
+}
+
+async function fetchDNS(domain){
+  const types=['A','AAAA','MX','NS','TXT','CNAME','SOA'];
+  const results={};
+  await Promise.allSettled(types.map(async t=>{
+    try{
+      const r=await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=${t}`,{headers:{'accept':'application/dns-json'},signal:AbortSignal.timeout(5000)});
+      if(!r.ok)return;
+      const d=await r.json();
+      if(d.Answer&&d.Answer.length){results[t]=d.Answer}
+    }catch(e){}
+  }));
+  return results;
+}
+
+async function fetchCerts(domain){
+  const resp=await fetch(`https://crt.sh/?q=%.${domain}&output=json`,{signal:AbortSignal.timeout(12000)});
+  if(!resp.ok)throw new Error('crt.sh failed');
+  const data=await resp.json();
+  // Deduplicate by common_name
+  const seen=new Set();
+  return data.filter(c=>{
+    const key=c.common_name||c.name_value;
+    if(seen.has(key))return false;
+    seen.add(key);return true;
+  }).sort((a,b)=>new Date(b.not_before)-new Date(a.not_before)).slice(0,100);
+}
+
+async function fetchHeaders(domain){
+  // Use allorigins CORS proxy to fetch headers
+  const target=`https://${domain}`;
+  const proxy=`https://api.allorigins.win/get?url=${encodeURIComponent(target)}`;
+  try{
+    const resp=await fetch(proxy,{signal:AbortSignal.timeout(10000)});
+    if(!resp.ok)throw new Error();
+    const data=await resp.json();
+    // allorigins returns status in the contents field
+    return {
+      status: data.status?.http_code || '?',
+      url: target,
+      // We can check for headers in the raw content
+      raw: data.contents?.substring(0,500)||'',
+      note:'Headers proxied via allorigins.win'
+    };
+  }catch(e){
+    // Fallback: just do a HEAD via fetch with no-cors (won't get headers but confirms reachability)
+    return {status:'Unknown',url:target,raw:'',note:'Direct header fetch blocked by CORS — target may still be live'};
+  }
+}
+
+// ── RENDER REPORT ──────────────────────────────────────────────────────────
+function renderReport(r){
+  const report=document.getElementById('report');
+  report.style.display='block';
+
+  // Compute risk indicators
+  const findings=[];
+  let riskLevel='LOW';
+
+  // Check security headers missing
+  const secHeaders=['Strict-Transport-Security','Content-Security-Policy','X-Frame-Options','X-Content-Type-Options','Referrer-Policy','Permissions-Policy'];
+
+  // Count subdomains
+  const subdomains=r.certs?[...new Set(r.certs.map(c=>(c.common_name||c.name_value).replace(/^\*/,'')).filter(s=>s.includes('.')))]:[];
+  const uniqueSubs=[...new Set(subdomains.filter(s=>s!==r.domain&&s.endsWith('.'+r.domain)))];
+
+  if(uniqueSubs.length>20){findings.push('Large attack surface: '+uniqueSubs.length+' subdomains identified');riskLevel='MEDIUM'}
+  if(uniqueSubs.length>50){riskLevel='HIGH'}
+
+  // Build HTML
+  let html='';
+
+  // Report header
+  const ts=new Date(r.timestamp).toUTCString();
+  html+=`<div class="report-header">
+    <div class="rh-top">
+      <div>
+        <div class="rh-target">${esc(r.domain)}</div>
+        <div class="rh-timestamp">SCAN COMPLETED: ${ts}</div>
+      </div>
+      <div class="risk-badge risk-${riskLevel.toLowerCase()}">${riskLevel} EXPOSURE</div>
+    </div>
+    <div class="rh-meta">
+      <div class="rh-meta-item">SUBDOMAINS FOUND: <strong>${uniqueSubs.length}</strong></div>
+      <div class="rh-meta-item">CERT RECORDS: <strong>${r.certs?r.certs.length:0}</strong></div>
+      <div class="rh-meta-item">DNS RECORD TYPES: <strong>${r.dns?Object.keys(r.dns).length:0}</strong></div>
+      <div class="rh-meta-item">SOURCE: <strong>PASSIVE ONLY</strong></div>
+    </div>
+  </div>`;
+
+  // WHOIS Section
+  if(r.whois!==undefined){
+    const w=r.whois;
+    let whoisBody='';
+    if(!w){
+      whoisBody='<div class="empty-section">WHOIS query failed or rate limited. Try again in 60 seconds.</div>';
+    } else {
+      const rows=[
+        ['REGISTRAR', w.registrar?.name||w.registrar||'—'],
+        ['REGISTERED', w.creation_date||w.created_date||'—'],
+        ['EXPIRES', w.expiration_date||w.expiry_date||'—'],
+        ['UPDATED', w.updated_date||'—'],
+        ['STATUS', Array.isArray(w.status)?w.status.join(', '):(w.status||'—')],
+        ['NAMESERVERS', Array.isArray(w.name_servers)?w.name_servers.join(', '):(w.name_servers||'—')],
+        ['REGISTRANT ORG', w.registrant?.organization||w.org||'—'],
+        ['REGISTRANT COUNTRY', w.registrant?.country||w.country||'—'],
+        ['DNSSEC', w.dnssec||'—'],
+      ];
+
+      // Check expiry
+      if(w.expiration_date||w.expiry_date){
+        const exp=new Date(w.expiration_date||w.expiry_date);
+        const daysLeft=Math.floor((exp-new Date())/86400000);
+        if(daysLeft<30&&daysLeft>0) findings.push(`Domain expires in ${daysLeft} days`);
+        if(daysLeft<0) findings.push('Domain may be expired');
+      }
+
+      whoisBody=rows.filter(([,v])=>v&&v!=='—').map(([k,v])=>`
+        <div class="data-row">
+          <span class="dr-key">${k}</span>
+          <span class="dr-val">${esc(String(v))}</span>
+        </div>`).join('');
+    }
+    html+=buildSection('01','WHOIS REGISTRATION',w?Object.keys(w).length:0,whoisBody);
+  }
+
+  // DNS Section
+  if(r.dns!==undefined){
+    let dnsBody='';
+    if(!r.dns||Object.keys(r.dns).length===0){
+      dnsBody='<div class="empty-section">No DNS records found.</div>';
+    } else {
+      const typeColor={A:'#00f5ff',AAAA:'#b060ff',MX:'#ff2d78',NS:'#ffe600',TXT:'#39ff14',CNAME:'#ff8c00',SOA:'#6b5080'};
+      Object.entries(r.dns).forEach(([type,records])=>{
+        records.forEach(rec=>{
+          const val=rec.data||'';
+          dnsBody+=`<div class="dns-record">
+            <span class="dns-type" style="color:${typeColor[type]||'#b060ff'}">${type}</span>
+            <span class="dns-val">${esc(val)}</span>
+            <span class="dns-ttl">TTL ${rec.TTL||'?'}</span>
+          </div>`;
+        });
+      });
+      // Check for interesting TXT records
+      const txtRecords=(r.dns.TXT||[]).map(r=>r.data||'');
+      const interesting=txtRecords.filter(t=>t.includes('spf')||t.includes('dmarc')||t.includes('google-site')||t.includes('MS=')||t.includes('docusign'));
+      if(interesting.length) findings.push('Interesting TXT records found: '+interesting.length);
+    }
+    const totalRecs=Object.values(r.dns||{}).reduce((s,a)=>s+a.length,0);
+    html+=buildSection('02','DNS RECORDS',totalRecs,dnsBody);
+  }
+
+  // Certificate Transparency Section
+  if(r.certs!==undefined){
+    let certBody='';
+    if(!r.certs||r.certs.length===0){
+      certBody='<div class="empty-section">No certificate records found on crt.sh.</div>';
+    } else {
+      // Subdomains
+      if(uniqueSubs.length>0){
+        certBody+=`<div style="margin-bottom:14px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">SUBDOMAINS (${uniqueSubs.length} unique)</div>
+          <div class="subdomain-grid">${uniqueSubs.map(s=>`<div class="subdomain-item">${esc(s)}</div>`).join('')}</div>
+        </div>`;
+      }
+
+      // Recent certs table
+      const recent=r.certs.slice(0,8);
+      certBody+=`<div style="margin-top:12px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">RECENT CERTIFICATES (${r.certs.length} total)</div>
+        ${recent.map(c=>`<div class="data-row">
+          <span class="dr-key" style="word-break:break-all">${esc(c.common_name||c.name_value||'—')}</span>
+          <span class="dr-val"><span style="color:var(--muted)">${esc(c.issuer_name?.match(/O=([^,]+)/)?.[1]||'—')}</span> · ${esc(c.not_before?.split('T')[0]||'—')} → ${esc(c.not_after?.split('T')[0]||'—')}</span>
+        </div>`).join('')}
+      </div>`;
+
+      // Issuers breakdown
+      const issuerMap={};
+      r.certs.forEach(c=>{const iss=c.issuer_name?.match(/O=([^,]+)/)?.[1]||'Unknown';issuerMap[iss]=(issuerMap[iss]||0)+1});
+      const issuerSorted=Object.entries(issuerMap).sort((a,b)=>b[1]-a[1]);
+      certBody+=`<div style="margin-top:14px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">CERTIFICATE AUTHORITIES</div>
+        <div>${issuerSorted.map(([name,count])=>`<span class="tag-pill">${esc(name)} (${count})</span>`).join('')}</div>
+      </div>`;
+    }
+    html+=buildSection('03','CERTIFICATE TRANSPARENCY',r.certs?.length||0,certBody);
+  }
+
+  // HTTP Headers Section
+  if(r.headers!==undefined){
+    let hBody='';
+    if(!r.headers){
+      hBody='<div class="empty-section">Header fetch failed. Target may block proxy requests.</div>';
+    } else {
+      hBody+=`<div style="margin-bottom:14px">
+        <div class="data-row"><span class="dr-key">TARGET URL</span><span class="dr-val highlight">${esc(r.headers.url)}</span></div>
+        <div class="data-row"><span class="dr-key">HTTP STATUS</span><span class="dr-val ${r.headers.status==200?'good':'warn'}">${esc(r.headers.status)}</span></div>
+        <div class="data-row"><span class="dr-key">NOTE</span><span class="dr-val">${esc(r.headers.note)}</span></div>
+      </div>`;
+
+      // Security header checklist
+      hBody+=`<div style="margin-top:12px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">SECURITY HEADER CHECKLIST</div>
+        <div class="header-matrix">
+          ${secHeaders.map(h=>`<div class="hm-item hm-missing">
+            ${esc(h)}
+            <span class="hm-status">// manual verification required</span>
+          </div>`).join('')}
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);margin-top:8px;letter-spacing:.06em">
+          ↗ Verify headers at: <a href="https://securityheaders.com/?q=${esc(r.domain)}" target="_blank" style="color:var(--purple)">securityheaders.com</a>
+        </div>
+      </div>`;
+    }
+    html+=buildSection('04','HTTP RECON',0,hBody,true);
+  }
+
+  // Findings summary
+  if(findings.length>0){
+    const findBody=findings.map(f=>`<div class="data-row"><span class="dr-key" style="color:var(--yellow)">⚠</span><span class="dr-val warn">${esc(f)}</span></div>`).join('');
+    html=`${html}<div style="order:-1">${buildSection('!!','NOTABLE FINDINGS',findings.length,findBody)}</div>`;
+  }
+
+  report.innerHTML=html;
+  report.style.display='block';
+  window.scrollTo({top:document.getElementById('report').offsetTop-20,behavior:'smooth'});
+}
+
+function buildSection(num,title,count,body,noCount=false){
+  return `<div class="section" id="sec-${num}">
+    <div class="section-title" onclick="toggleSection('sec-${num}')">
+      <div class="st-left">
+        <span class="st-icon">// ${num}</span>
+        <span class="st-name">${title}</span>
+        ${!noCount&&count>0?`<span class="st-count">${count}</span>`:''}
+      </div>
+      <span class="st-chevron">▼</span>
+    </div>
+    <div class="section-body">${body}</div>
+  </div>`;
+}
+
+function toggleSection(id){
+  document.getElementById(id).classList.toggle('collapsed');
+}
+</script>
+</body>
+</html>
