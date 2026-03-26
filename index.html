@@ -444,11 +444,17 @@ function renderReport(r){
   const secHeaders=['Strict-Transport-Security','Content-Security-Policy','X-Frame-Options','X-Content-Type-Options','Referrer-Policy','Permissions-Policy'];
 
   // Count subdomains
-  const subdomains=r.certs?[...new Set(r.certs.map(c=>(c.common_name||c.name_value).replace(/^\*/,'')).filter(s=>s.includes('.')))]:[];
-  const uniqueSubs=[...new Set(subdomains.filter(s=>s!==r.domain&&s.endsWith('.'+r.domain)))];
-
-  if(uniqueSubs.length>20){findings.push('Large attack surface: '+uniqueSubs.length+' subdomains identified');riskLevel='MEDIUM'}
-  if(uniqueSubs.length>50){riskLevel='HIGH'}
+  // Extract subdomains from CertSpotter dns_names arrays
+  const uniqueSubs=(()=>{
+    const s=new Set();
+    (r.certs||[]).forEach(c=>(c.dns_names||[]).forEach(n=>{
+      const clean=n.replace(/^\*\.?/,'').toLowerCase().trim();
+      if(clean&&clean!==r.domain&&clean.endsWith('.'+r.domain)) s.add(clean);
+    }));
+    return [...s].sort();
+  })();
+  if(uniqueSubs.length>20){findings.push('Large attack surface: '+uniqueSubs.length+' subdomains identified');riskLevel='MEDIUM';}
+  if(uniqueSubs.length>50){riskLevel='HIGH';}
 
   // Build HTML
   let html='';
@@ -464,7 +470,7 @@ function renderReport(r){
       <div class="risk-badge risk-${riskLevel.toLowerCase()}">${riskLevel} EXPOSURE</div>
     </div>
     <div class="rh-meta">
-      <div class="rh-meta-item">SUBDOMAINS FOUND: <strong>${(()=>{const s=new Set();(r.certs||[]).forEach(c=>(c.dns_names||[]).forEach(n=>s.add(n.replace(/^\*/,''))));return [...s].filter(n=>n!==r.domain&&n.endsWith('.'+r.domain)).length})()}</strong></div>
+      <div class="rh-meta-item">SUBDOMAINS FOUND: <strong>${uniqueSubs.length}</strong></div>
       <div class="rh-meta-item">CERT RECORDS: <strong>${r.certs?r.certs.length:0}</strong></div>
       <div class="rh-meta-item">DNS RECORD TYPES: <strong>${r.dns?Object.keys(r.dns).length:0}</strong></div>
       <div class="rh-meta-item">SOURCE: <strong>PASSIVE ONLY</strong></div>
@@ -539,19 +545,12 @@ function renderReport(r){
     if(!r.certs||r.certs.length===0){
       certBody='<div class="empty-section">No certificate records found on crt.sh.</div>';
     } else {
-      // CertSpotter returns dns_names arrays — flatten all unique names
-      const allNames=new Set();
-      r.certs.forEach(c=>(c.dns_names||[]).forEach(n=>allNames.add(n.replace(/^\*/,''))));
-      const uniqueSubs2=[...allNames].filter(n=>n!==r.domain&&n.endsWith('.'+r.domain)).sort();
-
-      if(uniqueSubs2.length>0){
+      // Subdomains (uniqueSubs already computed at top of renderReport)
+      if(uniqueSubs.length>0){
         certBody+=`<div style="margin-bottom:14px">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">SUBDOMAINS (${uniqueSubs2.length} unique)</div>
-          <div class="subdomain-grid">${uniqueSubs2.map(s=>`<div class="subdomain-item">${esc(s)}</div>`).join('')}</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">SUBDOMAINS (${uniqueSubs.length} unique)</div>
+          <div class="subdomain-grid">${uniqueSubs.map(s=>`<div class="subdomain-item">${esc(s)}</div>`).join('')}</div>
         </div>`;
-        // Update the stats counter
-        if(uniqueSubs2.length>20){findings.push('Large attack surface: '+uniqueSubs2.length+' subdomains identified');riskLevel='MEDIUM';}
-        if(uniqueSubs2.length>50){riskLevel='HIGH';}
       }
 
       // Recent issuances
@@ -559,7 +558,7 @@ function renderReport(r){
       certBody+=`<div style="margin-top:12px">
         <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">RECENT ISSUANCES (${r.certs.length} total)</div>
         ${recent.map(c=>`<div class="data-row">
-          <span class="dr-key" style="word-break:break-all">${esc((c.dns_names||[]).join(', ')||'—')}</span>
+          <span class="dr-key" style="word-break:break-all;color:var(--cyan)">${esc((c.dns_names||[]).slice(0,3).join(', ')||'—')}</span>
           <span class="dr-val">${esc(c.not_before?.split('T')[0]||'—')} → ${esc(c.not_after?.split('T')[0]||'—')}</span>
         </div>`).join('')}
       </div>`;
