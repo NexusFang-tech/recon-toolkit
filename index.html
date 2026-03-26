@@ -391,18 +391,22 @@ async function fetchDNS(domain){
 }
 
 async function fetchCerts(domain){
-  // Query both wildcard subdomains AND root domain
-  const query=encodeURIComponent('%25.'+domain);
-  const resp=await fetch('https://crt.sh/?q='+query+'&output=json',{signal:AbortSignal.timeout(15000)});
-  if(!resp.ok)throw new Error('crt.sh failed');
-  const data=await resp.json();
-  // Deduplicate by common_name
-  const seen=new Set();
-  return data.filter(c=>{
-    const key=c.common_name||c.name_value;
-    if(seen.has(key))return false;
-    seen.add(key);return true;
-  }).sort((a,b)=>new Date(b.not_before)-new Date(a.not_before)).slice(0,100);
+  // CertSpotter API by SSLMate — CORS-friendly, no auth needed for evaluation use
+  let all=[], after=null, pages=0;
+  while(pages<3){
+    const url='https://api.certspotter.com/v1/issuances?domain='+domain
+      +'&include_subdomains=true&expand=dns_names'
+      +(after?'&after='+after:'');
+    const resp=await fetch(url,{signal:AbortSignal.timeout(10000)});
+    if(!resp.ok) throw new Error('CertSpotter '+resp.status);
+    const page=await resp.json();
+    if(!Array.isArray(page)||page.length===0) break;
+    all=all.concat(page);
+    after=page[page.length-1].id;
+    pages++;
+    if(page.length<100) break;
+  }
+  return all;
 }
 
 async function fetchHeaders(domain){
@@ -460,7 +464,7 @@ function renderReport(r){
       <div class="risk-badge risk-${riskLevel.toLowerCase()}">${riskLevel} EXPOSURE</div>
     </div>
     <div class="rh-meta">
-      <div class="rh-meta-item">SUBDOMAINS FOUND: <strong>${uniqueSubs.length}</strong></div>
+      <div class="rh-meta-item">SUBDOMAINS FOUND: <strong>${(()=>{const s=new Set();(r.certs||[]).forEach(c=>(c.dns_names||[]).forEach(n=>s.add(n.replace(/^\*/,''))));return [...s].filter(n=>n!==r.domain&&n.endsWith('.'+r.domain)).length})()}</strong></div>
       <div class="rh-meta-item">CERT RECORDS: <strong>${r.certs?r.certs.length:0}</strong></div>
       <div class="rh-meta-item">DNS RECORD TYPES: <strong>${r.dns?Object.keys(r.dns).length:0}</strong></div>
       <div class="rh-meta-item">SOURCE: <strong>PASSIVE ONLY</strong></div>
@@ -535,31 +539,29 @@ function renderReport(r){
     if(!r.certs||r.certs.length===0){
       certBody='<div class="empty-section">No certificate records found on crt.sh.</div>';
     } else {
-      // Subdomains
-      if(uniqueSubs.length>0){
+      // CertSpotter returns dns_names arrays — flatten all unique names
+      const allNames=new Set();
+      r.certs.forEach(c=>(c.dns_names||[]).forEach(n=>allNames.add(n.replace(/^\*/,''))));
+      const uniqueSubs2=[...allNames].filter(n=>n!==r.domain&&n.endsWith('.'+r.domain)).sort();
+
+      if(uniqueSubs2.length>0){
         certBody+=`<div style="margin-bottom:14px">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">SUBDOMAINS (${uniqueSubs.length} unique)</div>
-          <div class="subdomain-grid">${uniqueSubs.map(s=>`<div class="subdomain-item">${esc(s)}</div>`).join('')}</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">SUBDOMAINS (${uniqueSubs2.length} unique)</div>
+          <div class="subdomain-grid">${uniqueSubs2.map(s=>`<div class="subdomain-item">${esc(s)}</div>`).join('')}</div>
         </div>`;
+        // Update the stats counter
+        if(uniqueSubs2.length>20){findings.push('Large attack surface: '+uniqueSubs2.length+' subdomains identified');riskLevel='MEDIUM';}
+        if(uniqueSubs2.length>50){riskLevel='HIGH';}
       }
 
-      // Recent certs table
-      const recent=r.certs.slice(0,8);
+      // Recent issuances
+      const recent=r.certs.slice(0,10);
       certBody+=`<div style="margin-top:12px">
-        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">RECENT CERTIFICATES (${r.certs.length} total)</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">RECENT ISSUANCES (${r.certs.length} total)</div>
         ${recent.map(c=>`<div class="data-row">
-          <span class="dr-key" style="word-break:break-all">${esc(c.common_name||c.name_value||'—')}</span>
-          <span class="dr-val"><span style="color:var(--muted)">${esc(c.issuer_name?.match(/O=([^,]+)/)?.[1]||'—')}</span> · ${esc(c.not_before?.split('T')[0]||'—')} → ${esc(c.not_after?.split('T')[0]||'—')}</span>
+          <span class="dr-key" style="word-break:break-all">${esc((c.dns_names||[]).join(', ')||'—')}</span>
+          <span class="dr-val">${esc(c.not_before?.split('T')[0]||'—')} → ${esc(c.not_after?.split('T')[0]||'—')}</span>
         </div>`).join('')}
-      </div>`;
-
-      // Issuers breakdown
-      const issuerMap={};
-      r.certs.forEach(c=>{const iss=c.issuer_name?.match(/O=([^,]+)/)?.[1]||'Unknown';issuerMap[iss]=(issuerMap[iss]||0)+1});
-      const issuerSorted=Object.entries(issuerMap).sort((a,b)=>b[1]-a[1]);
-      certBody+=`<div style="margin-top:14px">
-        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.15em;margin-bottom:8px">CERTIFICATE AUTHORITIES</div>
-        <div>${issuerSorted.map(([name,count])=>`<span class="tag-pill">${esc(name)} (${count})</span>`).join('')}</div>
       </div>`;
     }
     html+=buildSection('03','CERTIFICATE TRANSPARENCY',r.certs?.length||0,certBody);
